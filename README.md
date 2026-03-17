@@ -18,14 +18,14 @@ DCS solves this by creating **invisible Win32 desktops** where applications run 
 ```mermaid
 graph LR
     subgraph Host["AI Agent (host)"]
-        CLI["sandbox_ctl.py<br/>(CLI)"]
+        CLI["dcs<br/>(CLI)"]
     end
 
     subgraph Desktop["Hidden Win32 Desktop"]
-        Agent["cdcs_agent.py"]
-        Screenshot["screenshot.py"]
-        Mouse["mouse.py"]
-        Keyboard["keyboard.py"]
+        Agent["dcs-agent"]
+        Screenshot["screenshot"]
+        Mouse["mouse"]
+        Keyboard["keyboard"]
         App["[target app]"]
 
         Agent --> Screenshot
@@ -38,8 +38,8 @@ graph LR
     Agent -- "JSON response" --> CLI
 ```
 
-- **Host process** creates a Win32 desktop, spawns the agent, sends one command per pipe connection
-- **Agent process** runs on the hidden desktop, dispatches commands to input/capture modules
+- **`dcs`** — host CLI that creates Win32 desktops, spawns the agent, and sends one command per pipe connection
+- **`dcs-agent`** — runs on the hidden desktop, dispatches commands to input/capture modules
 - **Screenshots** use `PrintWindow` (works on hidden desktops where BitBlt returns black)
 - **Mouse clicks** use a 3-tier fallback: UIA > PostMessage > SendInput
 - **Keyboard** uses `PostMessage WM_CHAR` / `WM_KEYDOWN` (reliable on hidden desktops)
@@ -48,56 +48,57 @@ graph LR
 
 ```bash
 # Create an isolated desktop session
-python sandbox_ctl.py create my-session
+dcs create my-session
 
 # Launch an application on it
-python sandbox_ctl.py launch my-session "C:\Program Files\App\app.exe"
+dcs launch my-session "C:\Program Files\App\app.exe"
 
 # Take a screenshot (renders even on hidden desktop)
-python sandbox_ctl.py screenshot my-session --output screen.png
+dcs screenshot my-session --output screen.png
 
 # Click, type, send keys
-python sandbox_ctl.py click my-session 400 300
-python sandbox_ctl.py type my-session "Hello world"
-python sandbox_ctl.py key my-session ctrl+s
+dcs click my-session 400 300
+dcs type my-session "Hello world"
+dcs key my-session ctrl+s
 
 # Clean up
-python sandbox_ctl.py destroy my-session
+dcs destroy my-session
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `create <session>` | Create hidden desktop + agent process |
-| `destroy <session>` | Tear down session and kill processes |
-| `launch <session> <exe>` | Launch app on hidden desktop |
-| `screenshot <session>` | Capture window as PNG |
-| `click <session> <x> <y>` | Click at coordinates (client-area relative) |
-| `type <session> <text>` | Type text via PostMessage WM_CHAR |
-| `key <session> <combo>` | Send key combo (e.g. `ctrl+s`, `alt+f4`) |
-| `scroll <session> <x> <y> <delta>` | Scroll at position |
-| `windows <session>` | List all windows on desktop |
-| `focus <session> <hwnd>` | Focus a specific window |
-| `list` | List all active sessions |
+| `dcs create <session>` | Create hidden desktop + agent process |
+| `dcs destroy <session>` | Tear down session and kill processes |
+| `dcs launch <session> <exe>` | Launch app on hidden desktop |
+| `dcs screenshot <session>` | Capture window as PNG |
+| `dcs click <session> <x> <y>` | Click at coordinates (client-area relative) |
+| `dcs type <session> <text>` | Type text via PostMessage WM_CHAR |
+| `dcs key <session> <combo>` | Send key combo (e.g. `ctrl+s`, `alt+f4`) |
+| `dcs scroll <session> <x> <y> <delta>` | Scroll at position |
+| `dcs windows <session>` | List all windows on desktop |
+| `dcs focus <session> <hwnd>` | Focus a specific window |
+| `dcs list` | List all active sessions |
 
 All commands accept `--hwnd <handle>` to target a specific window.
 
 ## Installation
 
-### Option 1: Download binary (recommended)
+### Download binary (recommended)
 
-Grab the latest release from [Releases](https://github.com/aShanki/desktop-control-system/releases):
+Grab the latest release from [Releases](https://github.com/aShanki/desktop-control-system/releases). Unzip and add the folder to your `PATH`.
 
 ```bash
-# Unzip and add to PATH
 dcs create test-session
 dcs launch test-session notepad.exe
 dcs screenshot test-session --output test.png
 dcs destroy test-session
 ```
 
-### Option 2: From source
+If `test.png` shows a Notepad window, everything is working.
+
+### From source
 
 Requires Windows 10/11 and Python 3.12+.
 
@@ -108,19 +109,11 @@ pip install -r requirements.txt
 python sandbox_ctl.py create test-session
 ```
 
-### Verify Installation
-
-If `test.png` shows a Notepad window, everything is working.
+When running from source, set `CDCS_PYTHON_EXE` to override the Python interpreter used to spawn agent processes (defaults to `sys.executable`).
 
 ### Claude Code Integration
 
 Copy `skill/SKILL.md` into your Claude Code skill directory, or add this project's `skill/` folder to your Claude Code configuration. The skill file teaches the agent how to use the DCS agent loop.
-
-## Configuration
-
-| Environment Variable | Description | Default |
-|---------------------|-------------|---------|
-| `CDCS_PYTHON_EXE` | Path to Python interpreter used to spawn agent processes | `sys.executable` (the Python running `sandbox_ctl.py`) |
 
 ## Supported Applications
 
