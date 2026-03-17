@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine next version
+        id: semver
+        shell: bash
+        run: |
+          # Get latest tag or default to 0.0.0
+          LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          LATEST="${LATEST#v}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST"
+
+          # Read commit messages since last tag
+          if git describe --tags --abbrev=0 HEAD~ 2>/dev/null; then
+            COMMITS=$(git log "$(git describe --tags --abbrev=0 HEAD~)..HEAD" --pretty=format:"%s")
+          else
+            COMMITS=$(git log --pretty=format:"%s")
+          fi
+
+          # Bump based on conventional commits
+          if echo "$COMMITS" | grep -qiE "^(BREAKING CHANGE|.*!:)"; then
+            MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
+          elif echo "$COMMITS" | grep -qiE "^feat"; then
+            MINOR=$((MINOR + 1)); PATCH=0
+          else
+            PATCH=$((PATCH + 1))
+          fi
+
+          VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Next version: v$VERSION"
+
+      - name: Check if tag exists
+        id: check_tag
+        shell: bash
+        run: |
+          if git rev-parse "${{ steps.semver.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Python
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          pip install pywin32 Pillow pyinstaller
+
+      - name: Build binaries
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          pyinstaller dcs.spec --distpath dist
+
+      - name: Package release
+        if: steps.check_tag.outputs.exists == 'false'
+        shell: bash
+        run: |
+          cd dist
+          7z a -tzip "../dcs-${{ steps.semver.outputs.tag }}-windows-x64.zip" dcs.exe dcs-agent.exe
+
+      - name: Create release
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.semver.outputs.tag }}
+          name: DCS ${{ steps.semver.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            dcs-${{ steps.semver.outputs.tag }}-windows-x64.zip

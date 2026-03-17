@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+*.spec.bak
+
+# PyInstaller
+*.manifest
+*.exe
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Test output
+test_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Node (demo-video)
+node_modules/
+demo-video/out/
+
+# Evidence screenshots (generated during testing/demos)
+pkt-lab*.png
+evidence-*.png
+
+# Large media (keep gif, skip mp4)
+docs/demo/*.mp4
+
+# Session state
+.cdcs/

@@ -1,0 +1,13 @@
+[project]
+name = "desktop-control-system"
+version = "0.1.0"
+description = "Isolated GUI automation for AI agents on Windows"
+requires-python = ">=3.12"
+dependencies = [
+    "pywin32>=306",
+    "Pillow>=10.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
