@@ -361,11 +361,15 @@ def send_key(vk_code: int, scan_code: int = 0, extended: bool = False) -> None:
     ])
 
 
-def type_text(text: str, hwnd: int = None) -> dict:
+def type_text(text: str, hwnd: int = None, method: str = "auto") -> dict:
     """Type *text* character by character.
 
-    If *hwnd* is provided, uses ``PostMessage(WM_CHAR)`` targeted at that
-    window handle -- this is the reliable path for hidden-desktop scenarios.
+    *method* can be ``"auto"`` (default), ``"sendinput"``, or ``"postmessage"``.
+    When ``"sendinput"`` is specified, always uses SendInput regardless of hwnd.
+
+    If *hwnd* is provided and method is auto, uses ``PostMessage(WM_CHAR)``
+    targeted at that window handle -- this is the reliable path for
+    hidden-desktop scenarios.
 
     If *hwnd* is ``None``, falls back to ``SendInput`` with
     ``KEYEVENTF_UNICODE`` (legacy path, may be silently dropped on Win11
@@ -375,6 +379,22 @@ def type_text(text: str, hwnd: int = None) -> dict:
     """
     if not text:
         return {"ok": True, "chars": 0, "method": "none"}
+
+    if method == "sendinput":
+        log.debug("type_text via SendInput (forced), %d chars", len(text))
+        inputs: list[INPUT] = []
+        for ch in text:
+            code = ord(ch)
+            inputs.append(
+                _make_key_input(vk=0, scan=code, flags=KEYEVENTF_UNICODE)
+            )
+            inputs.append(
+                _make_key_input(
+                    vk=0, scan=code, flags=KEYEVENTF_UNICODE | KEYEVENTF_KEYUP
+                )
+            )
+        _send(inputs)
+        return {"ok": True, "chars": len(text), "method": "sendinput"}
 
     if hwnd is not None:
         # ── Primary path: PostMessage WM_CHAR ──
@@ -402,18 +422,15 @@ def type_text(text: str, hwnd: int = None) -> dict:
     return {"ok": True, "chars": len(text), "method": "sendinput"}
 
 
-def send_key_combo(combo: str, hwnd: int = None) -> dict:  # noqa: C901
+def send_key_combo(combo: str, hwnd: int = None, method: str = "auto") -> dict:  # noqa: C901
     """Send a key combination.
 
     *combo* is a ``+``-delimited string, e.g. ``"ctrl+shift+e"``,
     ``"alt+f4"``, ``"enter"``.  Modifiers are held while the final key is
     pressed, then all keys are released in reverse order.
 
-    If *hwnd* is provided, uses ``PostMessage(WM_KEYDOWN/WM_KEYUP)``
-    targeted at that window handle.  For Alt-based combos, uses
-    ``WM_SYSKEYDOWN`` / ``WM_SYSKEYUP``.
-
-    If *hwnd* is ``None``, falls back to ``SendInput`` (legacy path).
+    *method* can be ``"auto"`` (default), ``"sendinput"``, or ``"postmessage"``.
+    When ``"sendinput"`` is specified, always uses SendInput regardless of hwnd.
 
     Returns ``{"ok": True, "combo": combo, "method": "postmessage"|"sendinput"}``.
     """
@@ -425,6 +442,9 @@ def send_key_combo(combo: str, hwnd: int = None) -> dict:  # noqa: C901
         vks = [_resolve_key(p) for p in parts]
     except ValueError as exc:
         return {"ok": False, "error": str(exc)}
+
+    if method == "sendinput":
+        hwnd = None  # force SendInput path
 
     if hwnd is not None:
         # ── Primary path: PostMessage ──

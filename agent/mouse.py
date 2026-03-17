@@ -286,22 +286,28 @@ def click(
     y: int,
     button: str = "left",
     double: bool = False,
+    method: str = "auto",
 ) -> dict:
     """Click at *(x, y)* in client coordinates of *hwnd*.
 
-    Tries three strategies in order:
+    *method* controls which input strategy to use:
 
-    1. **UIA** -- safest, never moves the global cursor.
-    2. **PostMessage** -- reliable for most Win32 / WPF apps.
-    3. **SendInput** -- last resort, moves the global cursor.
+    - ``"auto"`` (default) -- tries UIA → PostMessage → SendInput.
+    - ``"sendinput"`` -- skip straight to SendInput (for Qt / Electron apps).
+    - ``"postmessage"`` -- use PostMessage only.
 
     Returns ``{"ok": True, "method": "uia"|"postmessage"|"sendinput"}``.
     """
     if not win32gui.IsWindow(hwnd):
         return {"ok": False, "error": f"Invalid window handle: {hwnd}"}
 
+    if method == "sendinput":
+        if _sendinput_click(hwnd, x, y, button=button, double=double):
+            return {"ok": True, "method": "sendinput", "x": x, "y": y}
+        return {"ok": False, "error": "SendInput click failed"}
+
     # Tier 1: UIA
-    if button == "left" and not double:
+    if method == "auto" and button == "left" and not double:
         if _try_uia_click(hwnd, x, y):
             return {"ok": True, "method": "uia", "x": x, "y": y}
 

@@ -261,11 +261,12 @@ def _handle_screenshot(msg: dict, desktop: str) -> dict:
 
 def _handle_type(msg: dict, desktop: str) -> dict:
     text = msg.get("text", "")
+    method = msg.get("method", "auto")
     hwnd = msg.get("hwnd")
     if hwnd:
         hwnd = int(hwnd)
     target = _get_keyboard_target(hwnd, desktop)
-    result = keyboard.type_text(text, hwnd=target)
+    result = keyboard.type_text(text, hwnd=target, method=method)
     if target:
         result["hwnd"] = target
     return result
@@ -273,13 +274,14 @@ def _handle_type(msg: dict, desktop: str) -> dict:
 
 def _handle_key(msg: dict, desktop: str) -> dict:
     combo = msg.get("combo", "")
+    method = msg.get("method", "auto")
     if not combo:
         return {"ok": False, "error": "Missing 'combo' in key command"}
     hwnd = msg.get("hwnd")
     if hwnd:
         hwnd = int(hwnd)
     target = _get_keyboard_target(hwnd, desktop)
-    result = keyboard.send_key_combo(combo, hwnd=target)
+    result = keyboard.send_key_combo(combo, hwnd=target, method=method)
     if target:
         result["hwnd"] = target
     return result
@@ -296,7 +298,8 @@ def _handle_click(msg: dict, desktop: str) -> dict:
     y = msg.get("y", 0)
     button = msg.get("button", "left")
     double = msg.get("double", False)
-    return mouse.click(int(hwnd), int(x), int(y), button=button, double=double)
+    method = msg.get("method", "auto")
+    return mouse.click(int(hwnd), int(x), int(y), button=button, double=double, method=method)
 
 
 def _handle_scroll(msg: dict, desktop: str) -> dict:

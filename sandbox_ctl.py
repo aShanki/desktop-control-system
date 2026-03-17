@@ -113,6 +113,8 @@ def cmd_click(args: argparse.Namespace) -> None:
         command["double"] = True
     if args.hwnd:
         command["hwnd"] = int(args.hwnd)
+    if args.sendinput:
+        command["method"] = "sendinput"
     _result(sb.send_command(args.session, command))
 
 
@@ -122,6 +124,8 @@ def cmd_type(args: argparse.Namespace) -> None:
     command: dict[str, Any] = {"cmd": "type", "text": args.text}
     if args.hwnd:
         command["hwnd"] = int(args.hwnd)
+    if args.sendinput:
+        command["method"] = "sendinput"
     _result(sb.send_command(args.session, command))
 
 
@@ -131,6 +135,8 @@ def cmd_key(args: argparse.Namespace) -> None:
     command: dict[str, Any] = {"cmd": "key", "combo": args.combo}
     if args.hwnd:
         command["hwnd"] = int(args.hwnd)
+    if args.sendinput:
+        command["method"] = "sendinput"
     _result(sb.send_command(args.session, command))
 
 
@@ -231,6 +237,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--double", action="store_true", help="Double-click")
     p.add_argument("--hwnd", default=None, help="Target window handle")
+    p.add_argument("--sendinput", action="store_true",
+                    help="Force SendInput instead of PostMessage (for Qt/Electron apps)")
     p.set_defaults(func=cmd_click)
 
     # -- type ---------------------------------------------------------
@@ -238,6 +246,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("session")
     p.add_argument("text", help="Text to type")
     p.add_argument("--hwnd", default=None, help="Target window handle")
+    p.add_argument("--sendinput", action="store_true",
+                    help="Force SendInput instead of PostMessage (for Qt/Electron apps)")
     p.set_defaults(func=cmd_type)
 
     # -- key ----------------------------------------------------------
@@ -248,6 +258,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("session")
     p.add_argument("combo", help="Key combination string")
     p.add_argument("--hwnd", default=None, help="Target window handle")
+    p.add_argument("--sendinput", action="store_true",
+                    help="Force SendInput instead of PostMessage (for Qt/Electron apps)")
     p.set_defaults(func=cmd_key)
 
     # -- scroll -------------------------------------------------------
