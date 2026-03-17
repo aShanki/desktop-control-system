@@ -102,7 +102,7 @@ class INPUT(ctypes.Structure):
 
 
 _SendInput = ctypes.windll.user32.SendInput
-_SendInput.argtypes = [ctypes.c_uint, ctypes.POINTER(INPUT), ctypes.c_int]
+_SendInput.argtypes = [ctypes.c_uint, ctypes.c_void_p, ctypes.c_int]
 _SendInput.restype = ctypes.c_uint
 
 
@@ -222,21 +222,15 @@ def _postmessage_click(
 def _sendinput_click(
     hwnd: int, x: int, y: int, button: str = "left", double: bool = False
 ) -> bool:
-    """Click using SendInput.
+    """Click using SetCursorPos + SendInput.
 
-    **Warning**: This moves the global mouse cursor. It is a last-resort
-    fallback. We convert client coords to absolute screen coords, move the
-    cursor, then send down/up events.
+    Moves the global mouse cursor to the target position using SetCursorPos
+    (which works correctly on hidden desktops), then sends down/up events
+    without MOUSEEVENTF_ABSOLUTE to avoid coordinate mapping issues.
     """
     try:
         # Client → screen.
         sx, sy = win32gui.ClientToScreen(hwnd, (x, y))
-
-        # Normalise to 0..65535 range for MOUSEEVENTF_ABSOLUTE.
-        screen_w = ctypes.windll.user32.GetSystemMetrics(0)  # SM_CXSCREEN
-        screen_h = ctypes.windll.user32.GetSystemMetrics(1)  # SM_CYSCREEN
-        abs_x = int(sx * 65536 / screen_w)
-        abs_y = int(sy * 65536 / screen_h)
 
         if button == "right":
             down_flag = MOUSEEVENTF_RIGHTDOWN
@@ -251,8 +245,8 @@ def _sendinput_click(
         def _mi(flags, data=0):
             inp = INPUT()
             inp.type = INPUT_MOUSE
-            inp._input.mi.dx = abs_x
-            inp._input.mi.dy = abs_y
+            inp._input.mi.dx = 0
+            inp._input.mi.dy = 0
             inp._input.mi.mouseData = data
             inp._input.mi.dwFlags = flags
             inp._input.mi.time = 0
@@ -261,10 +255,14 @@ def _sendinput_click(
 
         clicks = 2 if double else 1
         for _ in range(clicks):
+            # Position cursor first using SetCursorPos (reliable on hidden desktops).
+            ctypes.windll.user32.SetCursorPos(sx, sy)
+            time.sleep(0.02)
+
+            # Send click events at current cursor position (no ABSOLUTE flag).
             events = [
-                _mi(MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE),
-                _mi(down_flag | MOUSEEVENTF_ABSOLUTE),
-                _mi(up_flag | MOUSEEVENTF_ABSOLUTE),
+                _mi(down_flag),
+                _mi(up_flag),
             ]
             arr = (INPUT * len(events))(*events)
             _SendInput(len(events), arr, ctypes.sizeof(INPUT))

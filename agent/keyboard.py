@@ -93,7 +93,7 @@ class INPUT(ctypes.Structure):
 _SendInput = user32.SendInput
 _SendInput.argtypes = [
     ctypes.c_uint,
-    ctypes.POINTER(INPUT),
+    ctypes.c_void_p,
     ctypes.c_int,
 ]
 _SendInput.restype = ctypes.c_uint
