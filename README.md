@@ -87,7 +87,7 @@ All commands accept `--hwnd <handle>` to target a specific window.
 
 ### Option 1: Download binary (recommended)
 
-Grab the latest release from [Releases](https://github.com/AshankDsworpsworkin/desktop-control-system/releases):
+Grab the latest release from [Releases](https://github.com/aShanki/desktop-control-system/releases):
 
 ```bash
 # Unzip and add to PATH
@@ -102,7 +102,7 @@ dcs destroy test-session
 Requires Windows 10/11 and Python 3.12+.
 
 ```bash
-git clone https://github.com/AshankDsworpsworkin/desktop-control-system.git
+git clone https://github.com/aShanki/desktop-control-system.git
 cd desktop-control-system
 pip install -r requirements.txt
 python sandbox_ctl.py create test-session
