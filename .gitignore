@@ -31,16 +31,9 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
-# Node (demo-video)
-node_modules/
-demo-video/out/
-
-# Evidence screenshots (generated during testing/demos)
+# Generated screenshots
 pkt-lab*.png
 evidence-*.png
-
-# Large media (keep gif, skip mp4)
-docs/demo/*.mp4
 
 # Session state
 .cdcs/
