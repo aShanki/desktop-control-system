@@ -26,10 +26,12 @@ import datetime as _dt
 import json
 import os
 import pathlib
+import subprocess
 import sys
 import time
 from typing import Any
 
+from host import config as _config
 from host.pipe_client import PipeClient
 
 # =====================================================================
@@ -434,13 +436,26 @@ class DesktopSandbox:
                 "agent_pid": agent_pid,
             }
 
-        return {
+        result = {
             "ok":        True,
             "session":   name,
             "pipe":      pipe,
             "desktop":   name,
             "agent_pid": agent_pid,
         }
+
+        # Auto-launch preview if configured.
+        if _config.get("preview_enabled"):
+            preview_pid = self._spawn_preview(name)
+            if preview_pid:
+                result["preview_pid"] = preview_pid
+                # Persist the preview PID in session state.
+                state = _load_state(name)
+                if state:
+                    state["preview_pid"] = preview_pid
+                    _save_state(name, state)
+
+        return result
 
     # ==================================================================
     # destroy
@@ -453,6 +468,11 @@ class DesktopSandbox:
         """
         state = _load_state(name)
         agent_pid: int | None = state["agent_pid"] if state else None
+
+        # Kill preview window first (if tracked).
+        preview_pid = state.get("preview_pid") if state else None
+        if preview_pid and _is_process_alive(preview_pid):
+            _kill_process(preview_pid)
 
         # 1. Ask the agent to exit gracefully.
         if agent_pid and _is_process_alive(agent_pid):
@@ -519,6 +539,58 @@ class DesktopSandbox:
             return _send_one_command(name, command)
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
+
+    # ==================================================================
+    # preview
+    # ==================================================================
+
+    @staticmethod
+    def _spawn_preview(session: str) -> int | None:
+        """Launch the preview window as a detached process.
+
+        Returns the preview PID, or ``None`` on failure.
+        """
+        refresh = _config.get("preview_refresh_ms") or 500
+        script = str(_PROJECT / "host" / "preview.py")
+        try:
+            proc = subprocess.Popen(
+                [PYTHON_EXE, script, session,
+                 "--refresh-ms", str(refresh)],
+                cwd=str(_PROJECT),
+                creationflags=(
+                    subprocess.CREATE_NEW_PROCESS_GROUP
+                    | subprocess.DETACHED_PROCESS
+                ),
+                close_fds=True,
+            )
+            return proc.pid
+        except Exception:
+            return None
+
+    def open_preview(self, name: str) -> dict:
+        """Manually open a preview window for *name*.
+
+        Saves the preview PID in the session state so ``destroy`` can
+        clean it up.
+        """
+        state = _load_state(name)
+        if not state:
+            return {"ok": False, "error": f"Session '{name}' not found"}
+        if not _is_process_alive(state.get("agent_pid", 0)):
+            return {"ok": False, "error": f"Agent for '{name}' is not alive"}
+
+        # Kill any existing preview first.
+        old_pid = state.get("preview_pid")
+        if old_pid and _is_process_alive(old_pid):
+            _kill_process(old_pid)
+
+        pid = self._spawn_preview(name)
+        if not pid:
+            return {"ok": False, "error": "Failed to launch preview process"}
+
+        state["preview_pid"] = pid
+        _save_state(name, state)
+        return {"ok": True, "session": name, "preview_pid": pid}
 
     # ==================================================================
     # list_sessions

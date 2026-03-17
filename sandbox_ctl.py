@@ -20,6 +20,9 @@ Usage
     sandbox_ctl.py windows    <session>
     sandbox_ctl.py focus      <session> <hwnd>
     sandbox_ctl.py list
+    sandbox_ctl.py preview    <session>
+    sandbox_ctl.py config     get [key]
+    sandbox_ctl.py config     set <key> <value>
 
 Each invocation is **stateless**: it reads session metadata from
 ``~/.cdcs/sessions/<name>.json``, opens a fresh named-pipe connection
@@ -33,6 +36,7 @@ import json
 import sys
 from typing import Any
 
+from host import config
 from host.desktop_sandbox import DesktopSandbox
 
 # =====================================================================
@@ -175,6 +179,38 @@ def cmd_list(args: argparse.Namespace) -> None:
     _ok({"ok": True, "sessions": sessions})
 
 
+def cmd_preview(args: argparse.Namespace) -> None:
+    """Open a live preview window for a session."""
+    sb = DesktopSandbox()
+    _result(sb.open_preview(args.session))
+
+
+def cmd_config(args: argparse.Namespace) -> None:
+    """Get or set a persistent configuration value."""
+    if args.action == "get":
+        if args.key:
+            val = config.get(args.key)
+            _ok({"ok": True, "key": args.key, "value": val})
+        else:
+            _ok({"ok": True, "config": config.load()})
+    elif args.action == "set":
+        if not args.key or args.value is None:
+            _fail("Usage: config set <key> <value>")
+        # Coerce booleans and ints from CLI strings.
+        raw = args.value
+        if raw.lower() in ("true", "on", "yes", "1"):
+            val: Any = True
+        elif raw.lower() in ("false", "off", "no", "0"):
+            val = False
+        else:
+            try:
+                val = int(raw)
+            except ValueError:
+                val = raw
+        cfg = config.set_value(args.key, val)
+        _ok({"ok": True, "config": cfg})
+
+
 # =====================================================================
 # Argument parser
 # =====================================================================
@@ -288,6 +324,27 @@ def build_parser() -> argparse.ArgumentParser:
     # -- list ---------------------------------------------------------
     p = sub.add_parser("list", help="List all active sessions")
     p.set_defaults(func=cmd_list)
+
+    # -- preview ------------------------------------------------------
+    p = sub.add_parser(
+        "preview",
+        help="Open a live preview window for a session",
+    )
+    p.add_argument("session", help="Session name to preview")
+    p.set_defaults(func=cmd_preview)
+
+    # -- config -------------------------------------------------------
+    p = sub.add_parser(
+        "config",
+        help="Get or set persistent configuration values",
+    )
+    p.add_argument(
+        "action", choices=["get", "set"],
+        help="'get' to read, 'set' to write",
+    )
+    p.add_argument("key", nargs="?", default=None, help="Config key")
+    p.add_argument("value", nargs="?", default=None, help="Value to set")
+    p.set_defaults(func=cmd_config)
 
     return parser
 
